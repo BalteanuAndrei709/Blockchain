@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.0;
 
+// Balteanu Andrei
 contract ProductIdentification {
     address public owner;
 
@@ -111,12 +112,15 @@ contract ProductIdentification {
     }
 }
 
+// Filip Tudor
 contract ProductDeposit {
     address public owner;
     address payable public productIdentificationContract;
 
     uint256 public taxPerVolumeUnit;
     uint256 public maxDepositVolume;
+    uint256 internal currentDepositVolume;
+    uint256 internal withdrawsIdCounter;
 
     struct Product {
         address producer;
@@ -129,8 +133,15 @@ contract ProductDeposit {
         address owner;
     }
 
+    struct WithdrawDetails {
+        address who;
+        uint256 productId;
+        uint256 amount;
+    }
+
     mapping(uint256 => Product) public registeredProducts;
     mapping(address => ProductStoreDetails) public registeredProductStores;
+    mapping(uint256 => WithdrawDetails) public registeredProductsWithdraws;
 
     event newTaxPerVolumeUnitRegistered(uint256 newTaxPerVolumeUnit);
     event newMaximumDepositVolumeRegistered(uint256 newMaxDepositVolume);
@@ -140,17 +151,40 @@ contract ProductDeposit {
         uint256 amount
     );
     event productStoreRegistered(address indexed owner, address productStoreId);
+    event productWithdraw(
+        address indexed who,
+        uint256 productId,
+        uint256 amount
+    );
 
     constructor(address payable productIdentificationAddress) {
         owner = msg.sender;
         productIdentificationContract = productIdentificationAddress;
         taxPerVolumeUnit = 0;
         maxDepositVolume = 0;
+        currentDepositVolume = 0;
+        withdrawsIdCounter = 0;
     }
 
     modifier isOwner() {
         require(msg.sender == owner, "Only the owner can call this function.");
         _;
+    }
+
+    function increaseCurrentDepositVolume(uint256 amount) internal {
+        require(
+            currentDepositVolume + amount <= maxDepositVolume,
+            "To much volume added into deposit!"
+        );
+        currentDepositVolume = currentDepositVolume + amount;
+    }
+
+    function decreaseCurrentDepositVolume(uint256 amount) internal {
+        require(
+            currentDepositVolume - amount >= 0,
+            "Current deposit volume can not be negative!"
+        );
+        currentDepositVolume = currentDepositVolume - amount;
     }
 
     function setTaxPerVolumeUnit(uint256 value) public isOwner {
@@ -191,6 +225,7 @@ contract ProductDeposit {
             productId,
             quantity
         );
+        increaseCurrentDepositVolume(quantity);
 
         emit productDeposited(msg.sender, productId, quantity);
     }
@@ -214,5 +249,89 @@ contract ProductDeposit {
         emit productStoreRegistered(msg.sender, _productStore);
     }
 
-    
+    function retrieveProduct(uint256 productId, uint256 amount) external {
+        require(
+            (registeredProducts[productId].producer == msg.sender) ||
+                (registeredProductStores[msg.sender].productStore ==
+                    msg.sender),
+            "Not allowed to retrieve this product"
+        );
+        
+        if (registeredProducts[productId].volume - amount < 0) {
+            revert("Can not retrieve more than the actual amount!");
+        }
+        
+        registeredProducts[productId].volume = registeredProducts[productId].volume - amount;
+        registeredProductsWithdraws[withdrawsIdCounter] = WithdrawDetails(
+            msg.sender,
+            productId,
+            amount
+        );
+        decreaseCurrentDepositVolume(amount);
+
+        emit productWithdraw(msg.sender, productId, amount);
+    }
+
+    event receivePayment(address, uint256);
+    event fallbackCalled(string);
+
+    receive() external payable {
+        emit receivePayment(msg.sender, msg.value);
+    }
+
+    fallback() external {
+        emit fallbackCalled("Fallback called!");
+    }
+}
+
+// Roman Stefan
+contract ProductStore {
+    address public owner;
+    address payable public productIdentificationContract;
+    address payable public productDepositContract;
+
+    struct ProductInfo {
+        address owner;
+        uint256 productId;
+        uint256 amount;
+    }
+
+    mapping(address => ProductInfo) public registeredProducersAndTheirProducts;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier isOwner() {
+        require(msg.sender == owner, "Only the owner can call this function.");
+        _;
+    }
+
+    event productIdentificationContractRegistered(string);
+    event productDepositContractRegistered(string);
+
+    function setProductIdentificationContractAddress(address payable _address) external isOwner {
+        productIdentificationContract = _address;
+        emit productIdentificationContractRegistered("ProductIdentification contract registered!");
+    }
+
+    function setProductDepositContractAddress(address payable _address) external isOwner {
+        productDepositContract = _address;
+        emit productDepositContractRegistered("ProductDeposit contract registered!");
+    }
+
+    event receivePayment(address, uint256);
+    event fallbackCalled(string);
+
+    receive() external payable {
+        emit receivePayment(msg.sender, msg.value);
+    }
+
+    fallback() external {
+        emit fallbackCalled("Fallback called!");
+    }
+
+    function addProductIntoStore(uint256 productId, uint256 quantity) external {
+        
+    }
 }

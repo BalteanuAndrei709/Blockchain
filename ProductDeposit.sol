@@ -139,7 +139,7 @@ contract ProductDeposit {
         returns (bool)
     {
         require(
-            (registeredProducts[productId].producer == productOwner) &&
+            (registeredProducts[productId].producer == productOwner) ||
                 (registeredProductStores[productOwner] != address(0)),
             "Not allowed to retrieve this product"
         );

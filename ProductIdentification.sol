@@ -2,9 +2,12 @@
 
 pragma solidity ^0.8.0;
 
+import "contracts/SampleToken.sol";
+
 contract ProductIdentification {
     address public owner;
 
+    SampleToken public sampleToken;
     uint256 public registrationTax;
     uint256 internal productIdCounter;
 
@@ -52,16 +55,34 @@ contract ProductIdentification {
         emit registrationTaxChanged(registrationTax);
     }
 
-    function registerAsProducer() public payable {
+    function registerAsProducer(uint256 _registrationTax) public {
         require(
-            msg.value == registrationTax,
+            _registrationTax == registrationTax,
             "Registration tax is not correct."
         );
         require(
             !registeredProducers[msg.sender].isRegistered,
             "Producer is already registered."
         );
+
         registeredProducers[msg.sender].isRegistered = true;
+
+        bool buySuccess = sampleToken.transferFrom(
+            msg.sender,
+            address(this),
+            _registrationTax
+        );
+        require(buySuccess);
+
+        if (_registrationTax > registrationTax) {
+            bool returnSuccess = sampleToken.transferFrom(
+                address(this),
+                msg.sender,
+                _registrationTax - registrationTax
+            );
+            require(returnSuccess);
+        }
+
         emit ProducerRegistered(msg.sender);
     }
 

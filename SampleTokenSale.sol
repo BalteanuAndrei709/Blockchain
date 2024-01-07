@@ -25,6 +25,7 @@ contract SampleTokenSale {
     }
 
     function changeTokenPrice(uint256 _newPrice) public isOwner {
+        require(_newPrice >= 0);
         tokenPrice = _newPrice;
     }
 
@@ -37,12 +38,6 @@ contract SampleTokenSale {
 
         tokensSold += _numberOfTokens;
 
-        if (msg.value > _numberOfTokens * tokenPrice) {
-            payable(msg.sender).transfer(
-                msg.value - (_numberOfTokens * tokenPrice)
-            );
-        }
-
         require(
             tokenContract.allowance(owner, address(this)) >= _numberOfTokens,
             "Sale contract is not allowed to sell this amount of tokens!"
@@ -54,6 +49,12 @@ contract SampleTokenSale {
         );
 
         require(success);
+
+        if (msg.value > _numberOfTokens * tokenPrice) {
+            payable(msg.sender).transfer(
+                msg.value - (_numberOfTokens * tokenPrice)
+            );
+        }
 
         emit Sell(msg.sender, _numberOfTokens);
     }

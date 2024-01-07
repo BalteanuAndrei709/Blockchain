@@ -32,9 +32,10 @@ contract ProductIdentification {
         uint256 volume
     );
 
-    constructor() {
+    constructor(address _sampleTokenAddress) {
         owner = msg.sender;
         productIdCounter = 0;
+        sampleToken = SampleToken(_sampleTokenAddress);
     }
 
     modifier isOwner() {
@@ -57,7 +58,7 @@ contract ProductIdentification {
 
     function registerAsProducer(uint256 _registrationTax) public {
         require(
-            _registrationTax == registrationTax,
+            _registrationTax >= registrationTax,
             "Registration tax is not correct."
         );
         require(
@@ -69,14 +70,14 @@ contract ProductIdentification {
 
         bool buySuccess = sampleToken.transferFrom(
             msg.sender,
-            address(this),
+            owner,
             _registrationTax
         );
         require(buySuccess);
 
         if (_registrationTax > registrationTax) {
             bool returnSuccess = sampleToken.transferFrom(
-                address(this),
+                owner,
                 msg.sender,
                 _registrationTax - registrationTax
             );
@@ -118,6 +119,26 @@ contract ProductIdentification {
             "Product is not registered."
         );
         return registeredProducts[productId];
+    }
+
+    function isProductRegisteredByName(string memory _name)
+        public
+        view
+        returns (bool)
+    {
+        for (uint256 i = 0; i < productIdCounter; i++) {
+            if (
+                bytes(registeredProducts[i].name).length == bytes(_name).length
+            ) {
+                if (
+                    keccak256(abi.encodePacked(registeredProducts[i].name)) ==
+                    keccak256(abi.encodePacked(_name))
+                ) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     event receivePayment(address, uint256);

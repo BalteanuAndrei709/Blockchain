@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "contracts/ProductIdentification.sol";
+import "contracts/SampleToken.sol";
 
 contract Auction {
     address payable internal auction_owner;
@@ -42,6 +43,8 @@ contract Auction {
 
     function bid() public payable virtual returns (bool) {}
 
+    function bid2() public virtual returns (bool) {}
+
     function withdraw() public virtual returns (bool) {}
 
     function cancel_auction() external virtual returns (bool) {}
@@ -53,18 +56,25 @@ contract Auction {
 
 contract MyAuction is Auction {
     ProductIdentification public productIdentification;
+    SampleToken public sampleToken;
 
     constructor(
         uint256 _biddingTime,
         address payable _owner,
         string memory _brand,
-        string memory _Rnumber
+        string memory _Rnumber,
+        address payable _productIdentificationAddress,
+        address _sampleTokenAddress
     ) {
+        productIdentification = ProductIdentification(
+            _productIdentificationAddress
+        );
         require(
             productIdentification.isProductRegisteredByName(_brand),
             "The car's brand is not registered!"
         );
 
+        sampleToken = SampleToken(_sampleTokenAddress);
         auction_owner = _owner;
         auction_start = block.timestamp;
         auction_end = auction_start + _biddingTime * 1 hours;
@@ -80,6 +90,25 @@ contract MyAuction is Auction {
     fallback() external payable {}
 
     receive() external payable {}
+
+    function bid2(uint256 _value) public an_ongoing_auction returns (bool) {
+        require(_value > highestBid, "You can't bid, Make a higher Bid");
+        require(bids[msg.sender] == 0, "You already made a bid");
+
+        highestBidder = msg.sender;
+        highestBid = _value;
+        bidders.push(msg.sender);
+        bids[msg.sender] = highestBid;
+
+        require(
+            sampleToken.transferFrom(msg.sender, address(this), _value),
+            "There was a problem when trying to transfer tokens"
+        );
+
+        emit BidEvent(highestBidder, highestBid);
+
+        return true;
+    }
 
     function bid() public payable override an_ongoing_auction returns (bool) {
         require(
@@ -116,7 +145,13 @@ contract MyAuction is Auction {
 
         amount = bids[msg.sender];
         bids[msg.sender] = 0;
-        payable(msg.sender).transfer(amount);
+
+        // payable(msg.sender).transfer(amount);
+        require(
+            sampleToken.transfer(msg.sender, amount),
+            "There was a problem when trying to withdraw founds"
+        );
+
         emit WithdrawalEvent(msg.sender, amount);
         return true;
     }

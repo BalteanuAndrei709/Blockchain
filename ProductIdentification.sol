@@ -70,14 +70,15 @@ contract ProductIdentification {
 
         bool buySuccess = sampleToken.transferFrom(
             msg.sender,
-            owner,
+            address(this),
             _registrationTax
         );
         require(buySuccess);
 
         if (_registrationTax > registrationTax) {
+            sampleToken.approve(msg.sender, _registrationTax - registrationTax);
             bool returnSuccess = sampleToken.transferFrom(
-                owner,
+                address(this),
                 msg.sender,
                 _registrationTax - registrationTax
             );
@@ -90,7 +91,13 @@ contract ProductIdentification {
     function registerProduct(string memory productName, uint256 volume)
         public
         isRegisteredProducer
+        returns (uint256)
     {
+        require(
+            registeredProducers[msg.sender].isRegistered,
+            "You need to be registered as producer."
+        );
+
         productIdCounter++;
         registeredProducts[productIdCounter] = Product(
             msg.sender,
@@ -99,6 +106,8 @@ contract ProductIdentification {
         );
 
         emit ProductRegistered(msg.sender, productName, volume);
+
+        return productIdCounter;
     }
 
     function isProducerRegistered(address producerAddress)

@@ -35,13 +35,12 @@ contract SampleTokenSale {
             "Not enough money provided!"
         );
         require(tokenContract.balanceOf(address(this)) >= _numberOfTokens);
-
-        tokensSold += _numberOfTokens;
-
         require(
             tokenContract.allowance(owner, address(this)) >= _numberOfTokens,
             "Sale contract is not allowed to sell this amount of tokens!"
         );
+        
+        tokensSold += _numberOfTokens;
         bool success = tokenContract.transferFrom(
             owner,
             msg.sender,

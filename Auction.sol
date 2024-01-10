@@ -41,9 +41,7 @@ contract Auction {
         _;
     }
 
-    function bid() public payable virtual returns (bool) {}
-
-    function bid2() public virtual returns (bool) {}
+    function bid(uint256) public virtual returns (bool) {}
 
     function withdraw() public virtual returns (bool) {}
 
@@ -91,9 +89,20 @@ contract MyAuction is Auction {
 
     receive() external payable {}
 
-    function bid2(uint256 _value) public an_ongoing_auction returns (bool) {
+    function checkIfBidderIsNew(address _bidder) internal view returns (bool) {
+        address tmp;
+        for (uint256 i = 0; i < bidders.length; i++) {
+            tmp = bidders[i];
+            if (tmp == _bidder) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function bid(uint256 _value) public override an_ongoing_auction returns (bool) {
         require(_value > highestBid, "You can't bid, Make a higher Bid");
-        require(bids[msg.sender] == 0, "You already made a bid");
+        require(checkIfBidderIsNew(msg.sender), "You already made a bid");
 
         highestBidder = msg.sender;
         highestBid = _value;
@@ -105,20 +114,6 @@ contract MyAuction is Auction {
             "There was a problem when trying to transfer tokens"
         );
 
-        emit BidEvent(highestBidder, highestBid);
-
-        return true;
-    }
-
-    function bid() public payable override an_ongoing_auction returns (bool) {
-        require(
-            bids[msg.sender] + msg.value > highestBid,
-            "You can't bid, Make a higher Bid"
-        );
-        highestBidder = msg.sender;
-        highestBid = bids[msg.sender] + msg.value;
-        bidders.push(msg.sender);
-        bids[msg.sender] = highestBid;
         emit BidEvent(highestBidder, highestBid);
 
         return true;
@@ -146,13 +141,13 @@ contract MyAuction is Auction {
         amount = bids[msg.sender];
         bids[msg.sender] = 0;
 
-        // payable(msg.sender).transfer(amount);
         require(
             sampleToken.transfer(msg.sender, amount),
             "There was a problem when trying to withdraw founds"
         );
 
         emit WithdrawalEvent(msg.sender, amount);
+
         return true;
     }
 
@@ -161,11 +156,20 @@ contract MyAuction is Auction {
             block.timestamp > auction_end || STATE == auction_state.CANCELLED,
             "You can't destruct the contract,The auction is still open"
         );
+        address bidder_address;
+        uint256 bid_ammount;
+
         for (uint256 i = 0; i < bidders.length; i++) {
-            assert(bids[bidders[i]] == 0);
+            bidder_address = bidders[i];
+            bid_ammount = bids[bidder_address];
+            if (bid_ammount > 0 && bid_ammount != highestBid){
+                require(sampleToken.transferFrom(address(this), bidder_address, bid_ammount),
+                "There was a problem when trying to transfer tokens");
+            }
         }
 
         selfdestruct(auction_owner);
+
         return true;
     }
 }
